@@ -1,0 +1,325 @@
+<!doctype html>
+<html lang="zh-CN"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Pre-IPO 跨平台价差监控</title>
+<style>
+:root{--bg:#0d1117;--card:#161b22;--card2:#1c232d;--bd:#2a3340;--tx:#d7dde5;--mut:#8b96a5;--ac:#58a6ff;--ok:#3fb950;--warn:#d29922;--bad:#f85149;--hot:#ff7b3a}
+*{box-sizing:border-box}body{margin:0;background:var(--bg);color:var(--tx);font:14px/1.5 -apple-system,"PingFang SC","Microsoft YaHei",Segoe UI,sans-serif}
+header{position:sticky;top:0;z-index:20;background:#0d1117ee;backdrop-filter:blur(6px);border-bottom:1px solid var(--bd);padding:10px 18px;display:flex;flex-wrap:wrap;gap:10px 16px;align-items:center}
+h1{font-size:17px;margin:0}h2{font-size:15px;margin:0 0 8px}
+.sp{flex:1}.mut{color:var(--mut)}.small{font-size:12px}
+main{padding:14px 18px 60px;max-width:1280px;margin:auto}
+.card{background:var(--card);border:1px solid var(--bd);border-radius:10px;padding:12px 14px;margin-bottom:14px}
+button,input,select{background:var(--card2);color:var(--tx);border:1px solid var(--bd);border-radius:6px;padding:5px 10px;font:inherit}
+button{cursor:pointer}button:hover{border-color:var(--ac)}button.pri{background:#1f6feb;border-color:#1f6feb;color:#fff}button.danger:hover{border-color:var(--bad);color:var(--bad)}
+input[type=number],input[type=text],input[type=datetime-local]{width:130px}input:focus{outline:1px solid var(--ac)}
+label{display:inline-flex;align-items:center;gap:5px}
+.row{display:flex;flex-wrap:wrap;gap:8px 14px;align-items:center}
+.pill{display:inline-block;padding:1px 8px;border-radius:99px;font-size:12px;border:1px solid var(--bd)}
+.pill.ok{color:var(--ok);border-color:#2b6a3a}.pill.bad{color:var(--bad);border-color:#7d2a27}.pill.warn{color:var(--warn);border-color:#7a5c14}.pill.hot{color:#fff;background:var(--hot);border-color:var(--hot)}
+.dot{width:9px;height:9px;border-radius:50%;display:inline-block;background:var(--mut)}.dot.ok{background:var(--ok)}.dot.bad{background:var(--bad)}
+table{border-collapse:collapse;width:100%}th,td{padding:5px 8px;text-align:left;border-bottom:1px solid var(--bd);vertical-align:top}th{color:var(--mut);font-weight:500;font-size:12px;white-space:nowrap}
+td.n{text-align:right;font-variant-numeric:tabular-nums;white-space:nowrap}th.n{text-align:right}
+tr.stale td{color:var(--mut)}tr.stale td.v{text-decoration:none}tr.used td.pf{border-left:3px solid var(--ok)}tr.stale td.pf{border-left:3px solid #4a5361}
+.co{border:1px solid var(--bd);border-radius:10px;margin-bottom:12px;background:var(--card);overflow:hidden}
+.co.hot{border-color:var(--hot);box-shadow:0 0 0 1px var(--hot) inset,0 0 18px #ff7b3a33}
+.co>.hd{display:flex;flex-wrap:wrap;gap:6px 14px;align-items:center;padding:10px 14px;background:var(--card2)}
+.co.hot>.hd{background:#3a2314}
+.co .name{font-size:16px;font-weight:600}.big{font-size:20px;font-weight:700;font-variant-numeric:tabular-nums}
+.big.hot{color:var(--hot)}.big.ref{color:var(--warn)}
+.pill.unv{color:#fff;background:#8a5a00;border-color:#d29922}
+.pill.unv::before{content:"⚠ "}
+.vsp{margin-top:2px}
+.tag-ref{color:var(--warn);font-size:12px;border:1px dashed #7a5c14;border-radius:4px;padding:0 6px}
+.co table{margin:0}.co .bd{padding:0 6px 6px}
+.det td{background:#12171e;color:var(--mut);font-size:12px;white-space:normal}
+.hist li{padding:5px 0;border-bottom:1px solid var(--bd);list-style:none}.hist{margin:0;padding:0;max-height:260px;overflow:auto}
+#toasts{position:fixed;right:14px;top:70px;z-index:50;display:flex;flex-direction:column;gap:8px;max-width:360px}
+.toast{background:#2a1a10;border:1px solid var(--hot);border-radius:8px;padding:10px 12px;box-shadow:0 6px 24px #000a;cursor:pointer}
+#modal{position:fixed;inset:0;background:#000b;z-index:60;display:none;align-items:center;justify-content:center}
+#modal .box{background:var(--card);border:2px solid var(--hot);border-radius:12px;padding:20px 24px;width:min(560px,92vw);box-shadow:0 10px 50px #000}
+#modal h2{color:var(--hot);font-size:18px}
+.alc{padding:8px 10px;border:1px solid var(--bd);border-radius:8px;margin:8px 0;background:var(--card2)}
+details>summary{cursor:pointer;color:var(--ac)}
+.warnbar{background:#2d2308;border:1px solid #7a5c14;color:#f0c75e;padding:8px 12px;border-radius:8px;margin-bottom:12px}
+.errbar{background:#2d1111;border:1px solid #7d2a27;color:#ff9a95;padding:8px 12px;border-radius:8px;margin-bottom:12px}
+.fr{display:grid;grid-template-columns:repeat(auto-fill,minmax(210px,1fr));gap:8px}.fr>div{background:var(--card2);border:1px solid var(--bd);border-radius:8px;padding:6px 10px}
+a{color:var(--ac)}code{background:var(--card2);padding:1px 5px;border-radius:4px}
+.msg{margin-top:8px;padding:6px 10px;border-radius:6px;background:var(--card2)}
+.pill.old{color:#fff;background:#8a2a27;border-color:#8a2a27}
+.small-btn{font-size:12px;padding:2px 8px}
+.tw{overflow-x:auto;-webkit-overflow-scrolling:touch}
+body{max-width:100%;overflow-x:clip}
+.fr>div,.alc,.hist li,.msg,#manualList .pill{overflow-wrap:anywhere}
+@media(max-width:700px){
+body{overflow-wrap:anywhere}
+header{padding:8px 10px;gap:6px 10px}h1{font-size:15px;flex:1 1 100%}header .sp{display:none}header #status{flex:1 1 100%}
+main{padding:10px 10px 50px}
+.card{padding:10px}
+.row{gap:8px 10px}.row>label,.row>b{max-width:100%}
+input[type=number],input[type=text],input[type=datetime-local],select{width:100%!important;max-width:100%;min-width:0}
+.row>label{flex:1 1 140px;flex-wrap:wrap}
+#fm label{flex:1 1 100%;display:flex;flex-direction:column;align-items:stretch;gap:2px}
+#fm button{flex:1 1 100%}
+.row>.sp{display:none}
+.co>.hd{flex-direction:column;align-items:stretch;gap:4px;padding:10px}
+.co>.hd .sp{display:none}.co>.hd>div{text-align:left!important}
+.co .name{font-size:16px}.big{font-size:22px}
+.co .bd{padding:0 8px 8px}
+.co table,.co thead,.co tbody,.co tr,.co td{display:block;width:100%}
+.co thead{display:none}
+.co tr:not(.det){border:1px solid var(--bd);border-radius:8px;margin:8px 0;padding:6px 10px;background:var(--card2)}
+.co tr.used:not(.det){border-left:3px solid var(--ok)}.co tr.stale:not(.det){border-left:3px solid #4a5361}
+.co td{border:0;padding:3px 0;display:flex;justify-content:space-between;align-items:baseline;gap:12px;text-align:right!important;white-space:normal!important}
+.co td::before{content:attr(data-label);color:var(--mut);font-size:12px;flex:0 0 auto;text-align:left}
+.co td.pf{display:block;text-align:left!important;border-left:0!important;border-bottom:1px solid var(--bd);padding-bottom:6px;margin-bottom:3px;font-size:15px}
+.co td.pf::before{display:none}
+.co td.pf .pill{white-space:normal}
+.co td[data-label="标的"]{font-weight:600}
+.co td>div{min-width:0}.co td>div .small{display:block;text-align:right}
+.co tr.det{margin:-4px 0 8px;padding:6px 10px;border:1px dashed var(--bd);border-radius:8px}
+.co tr.det td{display:block;text-align:left!important;padding:0;background:transparent}.co tr.det td::before{display:none}
+.hist{max-height:320px}
+#toasts{left:10px;right:10px;top:auto;bottom:10px;max-width:none}
+#modal .box{padding:14px 14px;width:92vw;max-height:88vh;overflow:auto}
+.fr{grid-template-columns:1fr}
+details>summary{overflow-wrap:anywhere}
+}
+</style></head><body>
+<header>
+  <h1>📊 Pre-IPO 跨平台价差监控</h1>
+  <span id="status" class="small mut">加载中…</span>
+  <span class="sp"></span>
+  <button id="btnNotif" title="开启浏览器系统通知">🔔 开启系统通知</button>
+  <label class="small"><input type="checkbox" id="chkSound"> 🔊 提示音</label>
+  <button id="btnTest" class="small">测试弹窗</button>
+  <button id="btnRefresh">⟳ 立即刷新</button>
+</header>
+<main>
+<div id="bars"></div>
+
+<div class="card">
+  <div class="row">
+    <b>参数(仅保存在你的浏览器)</b>
+    <label>阈值 ≥ <input type="number" id="inThr" min="0.1" step="0.5"> %</label>
+    <label>数据最大年龄 <input type="number" id="inAge" min="1" step="5"> 分钟</label>
+    <label title="忽略平台自带的 stale 标记,只按最大年龄判断"><input type="checkbox" id="chkIgnore"> 忽略平台 stale 标记</label>
+    <label title="默认:涉及“口径未验证”行的价差只展示、不弹窗/不计入告警"><input type="checkbox" id="chkUnv"> 未验证口径也告警</label>
+    <button id="btnReset" class="small-btn">恢复默认</button>
+    <span class="sp"></span>
+    <label title="仅前端显示,不触发弹窗"><input type="checkbox" id="chkStale"> 显示含过期数据的“仅参考”价差</label>
+    <label><input type="checkbox" id="chkAll"> 显示无可比估值的公司</label>
+    <label><input type="checkbox" id="chkDet"> 展开口径说明</label>
+  </div>
+  <div class="small mut" style="margin-top:6px">价差 = (最高估值 ÷ 最低估值 − 1)×100%,仅使用“新鲜且有可比估值”的平台;修改参数后立即在浏览器内重新计算。<b>价差 ≠ 可无风险套利</b>(合约类型、资金费率、杠杆、流动性、赎回限制、手续费均不同),仅为研究线索,非投资建议。本站为纯静态只读页面,无交易功能。</div>
+</div>
+
+<div id="binNote" class="warnbar" style="display:none"></div>
+<div class="card"><h2>🚨 当前告警(按你的阈值实时计算) <span id="actCnt" class="pill"></span></h2><div id="active" class="small mut">—</div></div>
+
+<div class="card"><h2>平台数据新鲜度</h2><div id="fresh" class="fr"></div></div>
+
+<h2 style="margin:6px 2px 10px">逐公司对照</h2>
+<div id="companies"></div>
+<details class="card" id="others"><summary>其它公司(无可比估值,仅展示)</summary><div id="othersBody" class="small"></div></details>
+
+<div class="card">
+  <h2>✍️ 本地手动报价(如 Binance 官方价)</h2>
+  <div class="small mut" style="margin-bottom:8px">纯静态站点无法写入服务器,此处的报价<b>只保存在你当前浏览器的 localStorage</b>,仅你自己可见,并作为“xxx(手动)”独立平台参与你本地的价差计算和弹窗。估值 = 价格 × 股数(十亿)× 1e9,<b>按填写的报价时间计算新鲜度</b>。</div>
+  <form id="fm" class="row">
+    <label>平台 <input type="text" name="platform" value="Binance(手动)" style="width:110px"></label>
+    <label>公司 <select name="company" id="fmCo" required></select></label>
+    <label>合约 <input type="text" name="instrument" placeholder="ANTHROPICUSDT" style="width:140px"></label>
+    <label>价格 <input type="number" name="price" step="any" min="0" required></label>
+    <label>股数(十亿) <input type="number" name="sharesBillion" step="any" min="0" value="1" required style="width:90px"></label>
+    <label>报价时间 <input type="datetime-local" name="asOf" style="width:190px"></label>
+    <button class="pri" type="submit">添加</button>
+  </form>
+  <div id="fmMsg"></div>
+  <div id="manualList" class="small" style="margin-top:8px"></div>
+</div>
+
+<div class="card"><h2>🕘 最近告警历史</h2>
+  <div class="small mut" style="margin-bottom:6px">“服务端”= 后台推送脚本按默认口径(阈值 5%、最大年龄 60 分钟)记录并写入 data.json;“本地”= 本浏览器按你的参数触发过的弹窗。</div>
+  <ul id="hist" class="hist"></ul></div>
+
+<div class="card" id="basisCard" style="display:none"><h2>统一口径(share basis)</h2><div id="basisBody" class="small"></div></div>
+<div class="card"><h2>平台口径与限制</h2><div id="caveats" class="small"></div></div>
+<div class="small mut" id="foot"></div>
+</main>
+<div id="toasts"></div>
+<div id="modal"><div class="box"><h2>🚨 新的价差机会</h2><div id="mBody"></div><div class="row" style="margin-top:12px"><span class="sp"></span><button id="mClose" class="pri">知道了</button></div></div></div>
+
+<script>
+const $=s=>document.querySelector(s);
+const esc=s=>String(s??"").replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
+const fmtUsd=v=>v==null?"—":v>=1e12?(v/1e12).toFixed(3)+"T":v>=1e9?(v/1e9).toFixed(1)+"B":v>=1e6?(v/1e6).toFixed(1)+"M":String(Math.round(v));
+const fmtPx=v=>v==null?"—":v>=100?v.toFixed(1):v.toFixed(2);
+const fmtAge=m=>m==null||!isFinite(m)?"未知":m<1?"刚刚":m<90?Math.round(m)+" 分钟":m<2880?(m/60).toFixed(1)+" 小时":(m/1440).toFixed(1)+" 天";
+const ago=m=>m==null||!isFinite(m)?"未知":m<1?"刚刚":fmtAge(m)+"前";
+const tz="Asia/Shanghai";
+const fmtT=(iso,full)=>{if(!iso)return"未知";const d=new Date(iso);if(isNaN(d))return"未知";return d.toLocaleString("zh-CN",{timeZone:tz,hour12:false,...(full?{year:"numeric"}:{}),month:"2-digit",day:"2-digit",hour:"2-digit",minute:"2-digit",second:"2-digit"})};
+const LS={get:(k,d)=>{try{const v=localStorage.getItem(k);return v==null?d:JSON.parse(v)}catch{return d}},set:(k,v)=>{try{localStorage.setItem(k,JSON.stringify(v))}catch{}}};
+const POLL_MS=45000, STALE_DATA_MIN=15, CHANGE_PP=2, GONE_GRACE_MIN=30;
+const DEF={threshold:5,maxAgeMin:60,ignoreApiStale:false,alertUnverified:false};
+let D=null, loadErr=null, lastFetchOk=null, forceTest=false;
+let P={...DEF,...LS.get("pm.params",{})};
+const ui={stale:LS.get("ui.stale",false),all:LS.get("ui.all",false),det:LS.get("ui.det",false),sound:LS.get("ui.sound",false)};
+$("#chkStale").checked=ui.stale;$("#chkAll").checked=ui.all;$("#chkDet").checked=ui.det;$("#chkSound").checked=ui.sound;
+for(const [id,k] of [["#chkStale","stale"],["#chkAll","all"],["#chkDet","det"],["#chkSound","sound"]])$(id).onchange=e=>{ui[k]=e.target.checked;LS.set("ui."+k,ui[k]);if(k!=="sound")render();else if(ui.sound)beep()};
+function syncParams(){$("#inThr").value=P.threshold;$("#inAge").value=P.maxAgeMin;$("#chkIgnore").checked=P.ignoreApiStale;$("#chkUnv").checked=!!P.alertUnverified}
+syncParams();
+function applyParams(){const t=+$("#inThr").value,m=+$("#inAge").value;if(!(t>0&&t<=1000)||!(m>0&&m<=100000))return;P={threshold:t,maxAgeMin:m,ignoreApiStale:$("#chkIgnore").checked,alertUnverified:$("#chkUnv").checked};LS.set("pm.params",P);render()}
+for(const id of ["#inThr","#inAge","#chkIgnore","#chkUnv"])$(id).onchange=applyParams;
+$("#btnReset").onclick=()=>{P={...DEF};LS.set("pm.params",P);syncParams();render()};
+
+// ---- 提示音 / 通知 ----
+let ac; function beep(){try{ac??=new (window.AudioContext||window.webkitAudioContext)();ac.resume?.();const t=ac.currentTime;[880,1175,880].forEach((f,i)=>{const o=ac.createOscillator(),g=ac.createGain();o.frequency.value=f;o.type="sine";g.gain.setValueAtTime(.0001,t+i*.18);g.gain.exponentialRampToValueAtTime(.25,t+i*.18+.02);g.gain.exponentialRampToValueAtTime(.0001,t+i*.18+.16);o.connect(g).connect(ac.destination);o.start(t+i*.18);o.stop(t+i*.18+.17)})}catch{}}
+function refreshNotifBtn(){const b=$("#btnNotif");if(!("Notification"in window)){b.textContent="🔔 浏览器不支持通知";b.disabled=true;return}const p=Notification.permission;b.textContent=p==="granted"?"🔔 系统通知已开启":p==="denied"?"🔕 通知被浏览器禁用":"🔔 开启系统通知";}
+$("#btnNotif").onclick=async()=>{if(!("Notification"in window))return;if(Notification.permission==="default")await Notification.requestPermission();refreshNotifBtn();if(Notification.permission==="granted")try{new Notification("通知已开启",{body:"出现新的价差告警时将弹出系统通知(需保持本页面打开)"})}catch{}};
+refreshNotifBtn();
+
+// ---- 价差计算(浏览器内,依据 data.json 的原始报价) ----
+function manualRows(){return LS.get("pm.manual",[]).map(m=>({platform:m.platform,platformId:"manual",instrument:m.instrument,type:"手动报价(仅本浏览器)",status:"active",price:m.price,priceUnit:"USD/合约",valuationUsd:m.price*m.sharesBillion*1e9,asOf:m.asOf,apiStale:false,hardExcluded:null,basisVerified:false,basisNote:"手动输入的股数,口径未核对",liquidity:1e18,liquidityNote:"",note:"手动 "+m.price+"×"+m.sharesBillion+"B 股",caveat:"本地手动输入;价格/股数由你提供",_company:m.company,_mid:m.id}))}
+function compute(){
+  const now=Date.now(),man=manualRows(),out=[];
+  for(const c0 of D.companies){
+    const rows=[...c0.rows,...man.filter(m=>m._company===c0.key)].map(r=>{
+      const t=Date.parse(r.asOf),age=isFinite(t)?Math.max(0,(now-t)/60000):null;
+      const fresh=age!=null&&age<=P.maxAgeMin&&!(r.apiStale&&!P.ignoreApiStale);
+      const reason=age==null?"时间未知":(r.apiStale&&!P.ignoreApiStale)?"平台标记过期":!fresh?`过期(${fmtAge(age)}>${P.maxAgeMin}分钟)`:null;
+      const used=!r.hardExcluded&&fresh&&r.valuationUsd!=null;
+      return {...r,ageMin:age,fresh,usedInSpread:used,excludedReason:r.hardExcluded??reason};
+    });
+    const elig=(strict,onlyV)=>{const best=new Map();for(const r of rows){if(r.hardExcluded||r.valuationUsd==null)continue;if(strict&&!r.fresh)continue;if(onlyV&&r.basisVerified!==true)continue;const cur=best.get(r.platform);if(!cur||(r.liquidity??0)>(cur.liquidity??0))best.set(r.platform,r)}return[...best.values()]};
+    const sp=arr=>{if(arr.length<2)return null;const s=[...arr].sort((a,b)=>a.valuationUsd-b.valuationUsd),lo=s[0],hi=s.at(-1);const unv=[hi,lo].filter(r=>r.basisVerified!==true).map(r=>r.platform+":"+r.instrument);return{spreadPct:(hi.valuationUsd/lo.valuationUsd-1)*100,high:{platform:hi.platform,valuationUsd:hi.valuationUsd,ageMin:hi.ageMin},low:{platform:lo.platform,valuationUsd:lo.valuationUsd,ageMin:lo.ageMin},unverified:unv.length>0,unverifiedInstruments:unv}};
+    const spread=sp(elig(true)),spreadAll=sp(elig(false)),spreadV=sp(elig(true,true));
+    const okV=!!spreadV&&spreadV.spreadPct>=P.threshold,okU=!!P.alertUnverified&&!!spread&&spread.spreadPct>=P.threshold;
+    out.push({key:c0.key,name:c0.name,platforms:[...new Set(rows.map(r=>r.platform))],rows,spread,spreadAll,spreadV,alertSpread:okV?spreadV:(okU?spread:null),flagged:okV||okU,flaggedUnverified:!!spread&&spread.unverified&&spread.spreadPct>=P.threshold&&!(okV||okU)});
+  }
+  out.sort((a,b)=>(b.spread?.spreadPct??-1)-(a.spread?.spreadPct??-1)||(b.spreadAll?.spreadPct??-1)-(a.spreadAll?.spreadPct??-1));
+  return out;
+}
+
+// ---- 告警弹窗 ----
+const kindTxt={new:"新增告警",change:"价差显著变化",gone:"告警消失"};
+function alertHtml(a){return `<div class="alc"><b>${esc(a.company)}</b> <span class="pill hot">${a.spreadPct.toFixed(1)}%</span> <span class="pill">${kindTxt[a.kind]||a.kind}</span><br>高: <b>${esc(a.high)}</b> ${fmtUsd(a.highVal)} ／ 低: <b>${esc(a.low)}</b> ${fmtUsd(a.lowVal)}${a.previousPct!=null?`<br><span class="mut">此前 ${a.previousPct}% (Δ${a.deltaPp>=0?"+":""}${a.deltaPp}pp)</span>`:""}<br><span class="mut small">${fmtT(a.ts)} · 阈值 ${a.threshold}%</span></div>`}
+function notify(list,silent){
+  if(!list.length)return;
+  $("#mBody").innerHTML=list.map(alertHtml).join("")+`<div class="small mut">价差≠可无风险套利,请核对合约类型/资金费率/流动性/股数口径。</div>`;$("#modal").style.display="flex";
+  for(const a of list.slice(0,3)){const t=document.createElement("div");t.className="toast";t.innerHTML=alertHtml(a);t.onclick=()=>t.remove();$("#toasts").append(t);setTimeout(()=>t.remove(),15000)}
+  if(!silent&&ui.sound)beep();
+  if("Notification"in window&&Notification.permission==="granted")for(const a of list.slice(0,3))try{new Notification(`${a.company} 价差 ${a.spreadPct.toFixed(1)}%`,{body:`高: ${a.high} / 低: ${a.low}(${kindTxt[a.kind]})`,tag:a.key||a.id})}catch{}
+  document.title="🚨 "+list[0].company+" "+list[0].spreadPct.toFixed(1)+"% · Pre-IPO 价差监控";
+}
+$("#mClose").onclick=()=>{$("#modal").style.display="none";document.title="Pre-IPO 跨平台价差监控"};
+$("#btnTest").onclick=()=>notify([{id:"test"+Date.now(),kind:"new",company:"测试公司(Test)",spreadPct:12.3,high:"Hyperliquid",low:"Binance",highVal:2.1e12,lowVal:1.87e12,threshold:P.threshold,ts:new Date().toISOString()}]);
+// 去重: localStorage "pm.alertState" 记录已提示过的告警(公司 → 价差/高低两侧);
+// 新出现、高低两侧变化或价差变化 ≥2pp 才再次提示;告警消失 30 分钟后才清除记录(避免在阈值附近抖动时重复弹窗)。
+function checkAlerts(comps){
+  const st=LS.get("pm.alertState",{}),now=Date.now(),fresh=[],stale=dataAgeMin()>STALE_DATA_MIN;
+  const hist=LS.get("pm.localHist",[]);
+  for(const c of comps){
+    const k=c.key;
+    if(!c.flagged){if(st[k]&&!st[k].goneAt)st[k].goneAt=now;continue}
+    const s=c.alertSpread,pct=+s.spreadPct.toFixed(2),old=st[k];
+    const info={key:k,company:c.name,spreadPct:pct,high:s.high.platform,low:s.low.platform,highVal:s.high.valuationUsd,lowVal:s.low.valuationUsd,threshold:P.threshold,ts:new Date().toISOString()};
+    if(stale)continue; // 数据本身过旧时不弹新告警
+    if(!old||old.goneAt&&now-old.goneAt>GONE_GRACE_MIN*60e3){fresh.push({...info,id:"l"+now+k,kind:"new"});st[k]={pct,high:info.high,low:info.low}}
+    else{const d=pct-old.pct;if(Math.abs(d)>=CHANGE_PP||old.high!==info.high||old.low!==info.low){fresh.push({...info,id:"l"+now+k,kind:"change",previousPct:old.pct,deltaPp:+d.toFixed(2)});st[k]={pct,high:info.high,low:info.low}}else st[k]={...old,goneAt:undefined}}
+  }
+  for(const k of Object.keys(st))if(st[k].goneAt&&now-st[k].goneAt>GONE_GRACE_MIN*60e3)delete st[k];
+  LS.set("pm.alertState",st);
+  if(fresh.length){LS.set("pm.localHist",[...fresh.map(a=>({...a})),...hist].slice(0,60));notify(fresh)}
+}
+
+// ---- 渲染 ----
+const dataAgeMin=()=>D?(Date.now()-Date.parse(D.generatedAt))/60000:Infinity;
+let C=[];
+function renderBars(){
+  let h="";const age=dataAgeMin();
+  if(loadErr)h+=`<div class="errbar">⚠️ 最近一次拉取 data.json 失败: ${esc(loadErr)}${D?"(下方为上次成功的数据)":""}</div>`;
+  if(D&&age>STALE_DATA_MIN)h+=`<div class="errbar">⏰ <b>数据已过期:</b>data.json 生成于 ${ago(age)}(${fmtT(D.generatedAt,true)} CST),超过 ${STALE_DATA_MIN} 分钟——后台更新脚本可能已停止或推送/部署延迟。下方价差仅供参考,且不会触发新弹窗。</div>`;
+  if(D&&D.warnings?.length)h+=`<div class="warnbar">⚠️ 数据源警告: ${D.warnings.map(esc).join(";")}</div>`;
+  if(D&&!C.some(c=>c.spread))h+=`<div class="warnbar">当前没有任何公司同时拥有 ≥2 个<b>新鲜且可比较估值</b>的平台,因此无法计算可靠价差(这<b>不等于</b>“没有价差”)。可调大“数据最大年龄”,或打开“显示含过期数据的仅参考价差”。</div>`;
+  $("#bars").innerHTML=h;
+}
+function renderStatus(){
+  if(!D){$("#status").innerHTML=loadErr?`<span class="dot bad"></span> 无法加载 data.json: ${esc(loadErr)}(将自动重试)`:"加载中…";return}
+  const age=dataAgeMin(),old=age>STALE_DATA_MIN;
+  $("#status").innerHTML=`<span class="dot ${old||loadErr?"bad":"ok"}"></span> 数据更新于 <b>${fmtT(D.generatedAt,true)}</b> CST(${ago(age)})${old?` <span class="pill old">数据已 ${Math.round(age)} 分钟未更新</span>`:""} · 后台约每 5 分钟推送,页面每 ${POLL_MS/1000}s 轮询`;
+}
+function rowHtml(r){
+  const used=r.usedInSpread;const cls=used?"used":"stale";
+  let st=used?`<span class="pill ok">参与价差</span>`:r.fresh?`<span class="pill">不参与:${esc(r.excludedReason)}</span>`:`<span class="pill warn">仅参考</span> <span class="small">${esc(r.excludedReason||"过期")}</span>`;
+  const ck=r.check;
+  if(ck&&ck.refOnly&&!used)st=`<span class="pill warn">来源分歧过大/池子过浅 仅参考</span> <span class="small">${esc(ck.reasons.join(";"))}</span>`;
+  const bp=r.basisVerified===false?`<span class="pill unv" title="${esc(r.basisNote||"")}">口径未验证</span>`:r.basisVerified===true?`<span class="pill ok" title="${esc(r.basisNote||"")}">口径已验证</span>`:"";
+  if(bp)st=st+" "+bp;
+  const ckTxt=ck?`<div class="small ${ck.refOnly?"":"mut"}">多源${ck.method==="median"?"中位":ck.method==="mean"?"均值":"单源"}: ${ck.sources.map(x=>esc(x.name)+" "+fmtPx(x.price)).join(" / ")}<br>分歧 ${ck.divergencePct==null?"—":ck.divergencePct.toFixed(1)+"%"}(限 ${ck.maxDivPct}%) · 池深 ${fmtUsd(ck.depthUsd)}(限 ${fmtUsd(ck.minDepthUsd)})</div>`:"";
+  const priceTxt=r.price==null?"—":`${fmtPx(r.price)} <span class="small mut">${esc(r.priceUnit||"")}</span>`;
+  const cav=r.caveat??D.caveats?.[r.platformId]?.caveat??"";
+  let h=`<tr class="${cls}"><td class="pf" data-label="平台"><b>${esc(r.platform)}</b>${r.platformId==="binance"?' <span class="pill warn" title="价格来自 TradingView/CoinGecko 第三方聚合,非 Binance 直连;股数为估计值">第三方聚合·估算股数</span>':""}${r.platformId==="manual"?' <span class="pill">手动</span>':""}${r.origin?`<span class="pill ${r.origin==="live"?"ok":""}" title="${esc(r.originLabel||"")}">${r.origin==="live"?"实时源":"聚合器快照"}</span>`:""}<div class="small mut">${esc(r.type)}</div>${r.originLabel?`<div class="small mut">来源: ${esc(r.originLabel)}</div>`:""}</td><td data-label="标的">${r.url?`<a href="${esc(r.url)}" target="_blank" rel="noreferrer noopener">${esc(r.instrument)}</a>`:esc(r.instrument)}</td><td class="n" data-label="价格">${priceTxt}${ckTxt}</td><td class="n v" data-label="隐含估值">${r.valuationUsd==null?'<span class="mut">无估值</span>':fmtUsd(r.valuationUsd)}</td><td class="n" data-label="快照年龄"><div>${fmtAge(r.ageMin)}${r.fresh?"":' <span class="pill warn">过期</span>'}<div class="small mut">${fmtT(r.asOf)}</div></div></td><td data-label="是否参与价差">${st}</td></tr>`;
+  h+=`<tr class="det" style="display:${ui.det?"table-row":"none"}"><td colspan="6">${esc(r.note||"")}${r.note?"<br>":""}${r.liquidityNote?esc(r.liquidityNote)+"<br>":""}${r.basisNote?"换算口径: "+esc(r.basisNote)+"<br>":""}${r.normalized?`统一锚折算: 按 ${esc(r.normalized.anchorLabel)} 股数 ${r.normalized.anchorSharesBillion.toFixed(3)}B 折成每股 $${r.normalized.perShareUsd}${r.normalized.anchorPriceUsd?`(锚价 $${r.normalized.anchorPriceUsd},×${r.normalized.vsAnchor})`:""}<br>`:""}口径: ${esc(cav)}</td></tr>`;
+  return h;
+}
+function renderCompany(c){
+  const s=c.spread,a=c.spreadAll,hot=c.flagged;let sp;
+  if(s)sp=`<span class="big ${hot?"hot":""}">${s.spreadPct.toFixed(1)}%</span> ${s.unverified?`<span class="pill unv" title="涉及口径未验证: ${esc((s.unverifiedInstruments||[]).join("、"))}">口径未验证</span>`:""} <span class="small">高: <b>${esc(s.high.platform)}</b> ${fmtUsd(s.high.valuationUsd)} ／ 低: <b>${esc(s.low.platform)}</b> ${fmtUsd(s.low.valuationUsd)}</span> ${hot?'<span class="pill hot">超过阈值</span>':c.flaggedUnverified?'<span class="small mut">超阈值但未告警(口径未验证)</span>':""}${s.unverified&&c.spreadV?`<div class="small vsp">仅已验证口径: <b>${c.spreadV.spreadPct.toFixed(1)}%</b> ${esc(c.spreadV.high.platform)} ${fmtUsd(c.spreadV.high.valuationUsd)} ／ ${esc(c.spreadV.low.platform)} ${fmtUsd(c.spreadV.low.valuationUsd)}</div>`:""}`;
+  else sp=`<span class="mut">无法计算新鲜价差(新鲜且可比的平台 &lt;2)</span>`;
+  let refTxt="";
+  if(ui.stale&&a&&(!s||Math.abs(a.spreadPct-s.spreadPct)>.05))refTxt=`<div class="small"><span class="tag-ref">仅参考 · 含过期数据</span> <span class="big ref">${a.spreadPct.toFixed(1)}%</span> 高: ${esc(a.high.platform)} ${fmtUsd(a.high.valuationUsd)}(${fmtAge(a.high.ageMin)}前)／ 低: ${esc(a.low.platform)} ${fmtUsd(a.low.valuationUsd)}(${fmtAge(a.low.ageMin)}前) — 不触发弹窗</div>`;
+  return `<div class="co ${hot?"hot":""}"><div class="hd"><span class="name">${esc(c.name)}</span><span class="small mut">${c.platforms.map(esc).join(" · ")}</span><span class="sp"></span><div style="text-align:right">${sp}${refTxt}</div></div><div class="bd tw"><table><thead><tr><th>平台</th><th>标的</th><th class="n">价格</th><th class="n">隐含估值</th><th class="n">快照年龄</th><th>是否参与价差</th></tr></thead><tbody>${c.rows.map(rowHtml).join("")}</tbody></table></div></div>`;
+}
+function renderActive(){const act=C.filter(c=>c.flagged);$("#actCnt").textContent=act.length;$("#actCnt").className="pill "+(act.length?"hot":"");
+  const a1=act.map(c=>`<div class="alc"><b>${esc(c.name)}</b> <span class="pill hot">${c.alertSpread.spreadPct.toFixed(1)}%</span> ${c.alertSpread.unverified?'<span class="pill unv">口径未验证</span>':""} 高: <b>${esc(c.alertSpread.high.platform)}</b> ${fmtUsd(c.alertSpread.high.valuationUsd)} ／ 低: <b>${esc(c.alertSpread.low.platform)}</b> ${fmtUsd(c.alertSpread.low.valuationUsd)}</div>`).join("");
+  const a2=C.filter(c=>c.flaggedUnverified).map(c=>`<div class="alc"><b>${esc(c.name)}</b> <span class="pill">${c.spread.spreadPct.toFixed(1)}%</span> <span class="pill unv">口径未验证</span> <span class="small mut">仅展示·不告警 · ${esc(c.spread.unverifiedInstruments.join("、"))}${c.spreadV?" · 仅已验证口径 "+c.spreadV.spreadPct.toFixed(1)+"%":""}</span></div>`).join("");
+  $("#active").innerHTML=(a1+a2)||`无(阈值 ≥ ${P.threshold}%,仅新鲜数据,最大年龄 ${P.maxAgeMin} 分钟)`;}
+function renderBinNote(){const el=$("#binNote");const f=D?.freshness.find(x=>x.id==="binance");
+  if(!f){el.style.display="none";return}
+  el.style.display="";el.innerHTML=`<b>ℹ️ Binance 数据来源说明</b>: Binance 官方 API 在后台服务器网络返回 HTTP 451(地区限制),这里的 Binance 价格来自<b>第三方公开聚合</b>(TradingView scanner 为主,CoinGecko 兜底),<b>并非 Binance 直连</b>,可能有延迟/偏差;隐含估值按 share-basis.json 换算:Anthropic/OpenAI = 价格 × 公告估计股数 1B(Binance 自己的合约定义,非真实总股数);SpaceX 已上市并于 2026-06-10 rebase 至 13.08B 股,这里统一按 SEC 总股数 13.18B 并与 Nasdaq SPCX 现价交叉校验。当前状态: ${f.ok?"✅ 已获取":"❌ 获取失败"}${f.error?"("+esc(f.error)+")":""}${f.ok&&f.valuation?" · "+esc(f.valuation):""}。`}
+function renderFresh(){$("#fresh").innerHTML=D?D.freshness.map(f=>{const age=f.ok&&f.latestAsOf?(Date.now()-Date.parse(f.latestAsOf))/60000:null;const use=f.ok&&age!=null&&age<=P.maxAgeMin&&f.apiStale!==true;return `<div><span class="dot ${f.ok?(use?"ok":""):"bad"}"></span> <b>${esc(f.platform)}</b> <span class="pill ${!f.ok?"bad":use?"ok":"warn"}">${!f.ok?"获取失败":use?"新鲜":"过期·仅参考"}</span><div class="small mut">${f.ok?`最新快照 ${fmtT(f.latestAsOf)}(${ago(age)})`:esc(f.error||"")}</div><div class="small mut">${f.source?"来源: "+esc(f.source)+"<br>":""}${esc(f.valuation)}</div></div>`}).join(""):"—"}
+function renderMain(){
+  if(!D){$("#companies").innerHTML='<div class="mut">等待首次数据…</div>';return}
+  const withVal=C.filter(c=>c.spread||c.spreadAll||c.rows.some(x=>x.platformId==="manual"));
+  const rest=C.filter(c=>!withVal.includes(c));
+  const show=ui.all?C:withVal;
+  $("#companies").innerHTML=show.length?show.map(renderCompany).join(""):'<div class="mut">暂无可比公司</div>';
+  $("#others").style.display=ui.all?"none":"";
+  $("#othersBody").innerHTML=rest.map(c=>esc(c.name)+" <span class='mut'>("+c.platforms.map(esc).join("/")+")</span>").concat((D.singles||[]).map(c=>esc(c.name)+" <span class='mut'>("+c.platforms.map(esc).join("/")+")</span>")).join(" · ")||"无";
+  const sel=$("#fmCo");if(!sel.options.length||sel.dataset.n!=String(D.companies.length)){sel.dataset.n=D.companies.length;sel.innerHTML=D.companies.map(c=>`<option value="${esc(c.key)}">${esc(c.name)}</option>`).join("")}
+  $("#caveats").innerHTML=Object.values(D.caveats||{}).map(x=>`<p><b>${esc(x.platform)}</b>(${esc(x.type)}): ${esc(x.caveat)}</p>`).join("")+(D.coverageNotes||[]).map(n=>`<p class="mut">• ${esc(n.replace(/\*\*/g,""))}</p>`).join("");
+}
+function renderManual(){const l=LS.get("pm.manual",[]);$("#manualList").innerHTML=l.length?"已录入(仅本浏览器): "+l.map(m=>`<span class="pill">${esc(m.platform)} ${esc(m.companyName||m.company)} ${esc(m.instrument)} 价${m.price}×${m.sharesBillion}B = ${fmtUsd(m.price*m.sharesBillion*1e9)} · ${fmtT(m.asOf)} <a href="#" data-del="${esc(m.id)}" style="color:var(--bad)">删除</a></span>`).join(" "):'<span class="mut">尚无手动报价</span>';
+  document.querySelectorAll("[data-del]").forEach(a=>a.onclick=e=>{e.preventDefault();LS.set("pm.manual",LS.get("pm.manual",[]).filter(x=>x.id!==a.dataset.del));render()})}
+function renderHist(){
+  const sv=(D?.alerts?.history||[]).map(a=>({...a,src:"服务端"})),lc=LS.get("pm.localHist",[]).map(a=>({...a,src:"本地"}));
+  const h=[...sv,...lc].sort((a,b)=>Date.parse(b.ts)-Date.parse(a.ts)).slice(0,60);
+  $("#hist").innerHTML=h.length?h.map(a=>`<li><span class="mut small">${fmtT(a.ts,true)}</span> <span class="pill">${a.src}</span> <span class="pill ${a.kind==="gone"?"":"hot"}">${kindTxt[a.kind]||a.kind}</span> <b>${esc(a.company)}</b> ${a.spreadPct.toFixed(1)}% · 高 ${esc(a.high)} / 低 ${esc(a.low)}${a.previousPct!=null?` <span class="mut small">(此前 ${a.previousPct}%)</span>`:""}</li>`).join(""):'<li class="mut">暂无历史告警</li>'}
+function renderBasis(B){const el=$("#basisBody");if(!B){$("#basisCard").style.display="none";return}$("#basisCard").style.display="";
+  const co=Object.entries(B.companies||{}).map(([k,a])=>`<p><b>${esc(k)}</b> 锚: ${esc(a.label)}(${esc(a.date)}) · 估值 ${fmtUsd(a.valuationUsd)} · 每股 ${a.pricePerShareUsd==null?"—":"$"+(+a.pricePerShareUsd).toFixed(2)} · 股数 ${(+a.sharesBillion).toFixed(3)}B<br><span class="mut">${esc(a.note||"")}</span></p>`).join("");
+  const ins=Object.entries(B.instruments||{}).map(([k,v])=>`<li><span class="pill ${v.verified?"ok":"unv"}">${v.verified?"口径已验证":"口径未验证"}</span> <b>${esc(k)}</b>: ${esc(v.unitMeaning)}<br><span class="mut">${esc(v.note||"")}</span></li>`).join("");
+  el.innerHTML=`<p class="mut">${esc(B.caution||"")}(配置文件 ${esc(B.file||"")},研究日期 ${esc(B.researchedAt||"")})</p>${co}<ul style="padding-left:18px;margin:6px 0">${ins}</ul>`}
+function render(){
+  renderStatus();
+  if(D){C=compute();renderBars();renderActive();renderBinNote();renderFresh();renderMain();renderBasis(D.basis);renderHist();checkAlerts(C)}else renderBars();
+  renderManual();
+  $("#foot").textContent="数据源(每行标注“实时源/聚合器快照”): Hyperliquid 公开 Info API;PreStocks=Jupiter 链上聚合价;Jarsy=app.jarsy.com 公开 token_list(日收盘价);Hiive50=Clarity 公开指数页(日更);Polymarket=gamma-api 概率;Binance=TradingView/CoinGecko 第三方聚合价;任一实时源失败时回退 preipo.polyos.ai 聚合器快照(可能已过期)。时区: 北京时间(CST)。纯静态只读页面,无后端、无凭据、无交易。";
+}
+$("#fm").onsubmit=e=>{e.preventDefault();const f=e.target,m=$("#fmMsg");const b=Object.fromEntries(new FormData(f));
+  const price=+b.price,sh=+b.sharesBillion;if(!(price>0)||!(sh>0)){m.className="msg";m.textContent="❌ 价格和股数需为正数";return}
+  let t=b.asOf?new Date(b.asOf):new Date();if(isNaN(t)||t.getTime()>Date.now()+5*60e3){m.className="msg";m.textContent="❌ 报价时间无效或在未来";return}
+  let platform=String(b.platform||"Binance(手动)").trim().slice(0,40)||"Binance(手动)";if(platform.toLowerCase()==="binance")platform="Binance(手动)";
+  const co=D?.companies.find(c=>c.key===b.company);
+  const l=LS.get("pm.manual",[]).filter(x=>!(x.platform===platform&&x.company===b.company&&x.instrument===(b.instrument||"手动报价")));
+  l.push({id:Math.random().toString(36).slice(2,9),platform,company:b.company,companyName:co?.name,instrument:String(b.instrument||"").trim()||platform+" 手动报价",price,sharesBillion:sh,asOf:t.toISOString()});
+  LS.set("pm.manual",l);m.className="msg";m.textContent="✅ 已保存到本浏览器并重新计算";setNow();render()};
+const setNow=()=>{const d=new Date(Date.now()-new Date().getTimezoneOffset()*60000);$("#fm").asOf.value=d.toISOString().slice(0,16)};setNow();
+
+async function load(){
+  try{const r=await fetch("data.json?t="+Date.now(),{cache:"no-store"});if(!r.ok)throw new Error("HTTP "+r.status);const j=await r.json();if(!j.generatedAt||!Array.isArray(j.companies))throw new Error("data.json 格式无效");D=j;loadErr=null;lastFetchOk=Date.now()}
+  catch(e){loadErr=e.message}
+  render();
+}
+$("#btnRefresh").onclick=async()=>{$("#btnRefresh").disabled=true;await load();$("#btnRefresh").disabled=false};
+load();setInterval(load,POLL_MS);setInterval(()=>{if(D){renderStatus();renderBars()}},15000);
+</script></body></html>
