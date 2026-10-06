@@ -48,6 +48,7 @@ a{color:var(--ac)}code{background:var(--card2);padding:1px 5px;border-radius:4px
 .pill.old{color:#fff;background:#8a2a27;border-color:#8a2a27}
 .small-btn{font-size:12px;padding:2px 8px}
 .tw{overflow-x:auto;-webkit-overflow-scrolling:touch}
+.mkt{margin-top:2px;line-height:1.35}
 body{max-width:100%;overflow-x:clip}
 .fr>div,.alc,.hist li,.msg,#manualList .pill{overflow-wrap:anywhere}
 @media(max-width:700px){
@@ -75,7 +76,7 @@ input[type=number],input[type=text],input[type=datetime-local],select{width:100%
 .co td.pf::before{display:none}
 .co td.pf .pill{white-space:normal}
 .co td[data-label="标的"]{font-weight:600}
-.co td>div{min-width:0}.co td>div .small{display:block;text-align:right}
+.co td>div{min-width:0}.co td>div .small{display:block;text-align:right}.co td .mkt{font-size:11.5px;line-height:1.35}
 .co tr.det{margin:-4px 0 8px;padding:6px 10px;border:1px dashed var(--bd);border-radius:8px}
 .co tr.det td{display:block;text-align:left!important;padding:0;background:transparent}.co tr.det td::before{display:none}
 .hist{max-height:320px}
@@ -248,6 +249,10 @@ function renderStatus(){
   const age=dataAgeMin(),old=age>STALE_DATA_MIN;
   $("#status").innerHTML=`<span class="dot ${old||loadErr?"bad":"ok"}"></span> 数据更新于 <b>${fmtT(D.generatedAt,true)}</b> CST(${ago(age)})${old?` <span class="pill old">数据已 ${Math.round(age)} 分钟未更新</span>`:""} · 后台约每 5 分钟推送,页面每 ${POLL_MS/1000}s 轮询`;
 }
+function fmtFund(m){if(m.fundingRate==null)return"—";const v=m.fundingRate*100;return(v>0?"+":"")+v.toFixed(4)+"%"+(m.fundingIntervalH?"/"+(+(+m.fundingIntervalH).toFixed(2))+"h":"")}
+const fmtK=v=>v==null?"—":v>=1e6?fmtUsd(v):v>=1e3?(v/1e3).toFixed(0)+"K":String(Math.round(v));
+function mktHtml(r){const m=r.mkt;if(!m)return"";const p=[];if(m.fundingRate!=null||m.fundingIntervalH)p.push("资金费率 "+fmtFund(m));if(m.vol24hUsd!=null)p.push("24h量 $"+fmtK(m.vol24hUsd));if(m.oiUsd!=null)p.push("OI $"+fmtK(m.oiUsd));if(m.bookSpreadPct!=null)p.push("盘口差 "+(+m.bookSpreadPct).toFixed(2)+"%");if(m.priceBasis)p.push(esc(m.priceBasis));return p.length?`<div class="small mut mkt">${p.join(" · ")}</div>`:""}
+function sortRows(rs){const u=rs.filter(r=>r.usedInSpread).sort((a,b)=>(b.valuationUsd??0)-(a.valuationUsd??0));return[...u,...rs.filter(r=>!r.usedInSpread)]}
 function rowHtml(r){
   const used=r.usedInSpread;const cls=used?"used":"stale";
   let st=used?`<span class="pill ok">参与价差</span>`:r.fresh?`<span class="pill">不参与:${esc(r.excludedReason)}</span>`:`<span class="pill warn">仅参考</span> <span class="small">${esc(r.excludedReason||"过期")}</span>`;
@@ -258,7 +263,7 @@ function rowHtml(r){
   const ckTxt=ck?`<div class="small ${ck.refOnly?"":"mut"}">多源${ck.method==="median"?"中位":ck.method==="mean"?"均值":"单源"}: ${ck.sources.map(x=>esc(x.name)+" "+fmtPx(x.price)).join(" / ")}<br>分歧 ${ck.divergencePct==null?"—":ck.divergencePct.toFixed(1)+"%"}(限 ${ck.maxDivPct}%) · 池深 ${fmtUsd(ck.depthUsd)}(限 ${fmtUsd(ck.minDepthUsd)})</div>`:"";
   const priceTxt=r.price==null?"—":`${fmtPx(r.price)} <span class="small mut">${esc(r.priceUnit||"")}</span>`;
   const cav=r.caveat??D.caveats?.[r.platformId]?.caveat??"";
-  let h=`<tr class="${cls}"><td class="pf" data-label="平台"><b>${esc(r.platform)}</b>${r.platformId==="binance"?' <span class="pill warn" title="价格来自 TradingView/CoinGecko 第三方聚合,非 Binance 直连;股数为估计值">第三方聚合·估算股数</span>':""}${r.platformId==="manual"?' <span class="pill">手动</span>':""}${r.origin?`<span class="pill ${r.origin==="live"?"ok":""}" title="${esc(r.originLabel||"")}">${r.origin==="live"?"实时源":"聚合器快照"}</span>`:""}<div class="small mut">${esc(r.type)}</div>${r.originLabel?`<div class="small mut">来源: ${esc(r.originLabel)}</div>`:""}</td><td data-label="标的">${r.url?`<a href="${esc(r.url)}" target="_blank" rel="noreferrer noopener">${esc(r.instrument)}</a>`:esc(r.instrument)}</td><td class="n" data-label="价格">${priceTxt}${ckTxt}</td><td class="n v" data-label="隐含估值">${r.valuationUsd==null?'<span class="mut">无估值</span>':fmtUsd(r.valuationUsd)}</td><td class="n" data-label="快照年龄"><div>${fmtAge(r.ageMin)}${r.fresh?"":' <span class="pill warn">过期</span>'}<div class="small mut">${fmtT(r.asOf)}</div></div></td><td data-label="是否参与价差">${st}</td></tr>`;
+  let h=`<tr class="${cls}"><td class="pf" data-label="平台"><b>${esc(r.platform)}</b>${r.platformId==="binance"?(/官方/.test(r.originLabel||"")?' <span class="pill ok" title="Binance 官方 fapi 公开接口;股数为 Binance 公告的估计股数">官方API·估计股数</span>':' <span class="pill warn" title="价格来自 TradingView/CoinGecko 第三方聚合,非 Binance 直连;股数为估计值">第三方聚合·估算股数</span>'):""}${r.platformId==="manual"?' <span class="pill">手动</span>':""}${r.origin?`<span class="pill ${r.origin==="live"?"ok":""}" title="${esc(r.originLabel||"")}">${r.origin==="live"?"实时源":"聚合器快照"}</span>`:""}<div class="small mut">${esc(r.type)}</div>${r.originLabel?`<div class="small mut">来源: ${esc(r.originLabel)}</div>`:""}</td><td data-label="标的">${r.url?`<a href="${esc(r.url)}" target="_blank" rel="noreferrer noopener">${esc(r.instrument)}</a>`:esc(r.instrument)}</td><td class="n" data-label="价格"><div>${priceTxt}${ckTxt}${mktHtml(r)}</div></td><td class="n v" data-label="隐含估值">${r.valuationUsd==null?'<span class="mut">无估值</span>':fmtUsd(r.valuationUsd)}</td><td class="n" data-label="快照年龄"><div>${fmtAge(r.ageMin)}${r.fresh?"":' <span class="pill warn">过期</span>'}<div class="small mut">${fmtT(r.asOf)}</div></div></td><td data-label="是否参与价差">${st}</td></tr>`;
   h+=`<tr class="det" style="display:${ui.det?"table-row":"none"}"><td colspan="6">${esc(r.note||"")}${r.note?"<br>":""}${r.liquidityNote?esc(r.liquidityNote)+"<br>":""}${r.basisNote?"换算口径: "+esc(r.basisNote)+"<br>":""}${r.normalized?`统一锚折算: 按 ${esc(r.normalized.anchorLabel)} 股数 ${r.normalized.anchorSharesBillion.toFixed(3)}B 折成每股 $${r.normalized.perShareUsd}${r.normalized.anchorPriceUsd?`(锚价 $${r.normalized.anchorPriceUsd},×${r.normalized.vsAnchor})`:""}<br>`:""}口径: ${esc(cav)}</td></tr>`;
   return h;
 }
@@ -268,7 +273,7 @@ function renderCompany(c){
   else sp=`<span class="mut">无法计算新鲜价差(新鲜且可比的平台 &lt;2)</span>`;
   let refTxt="";
   if(ui.stale&&a&&(!s||Math.abs(a.spreadPct-s.spreadPct)>.05))refTxt=`<div class="small"><span class="tag-ref">仅参考 · 含过期数据</span> <span class="big ref">${a.spreadPct.toFixed(1)}%</span> 高: ${esc(a.high.platform)} ${fmtUsd(a.high.valuationUsd)}(${fmtAge(a.high.ageMin)}前)／ 低: ${esc(a.low.platform)} ${fmtUsd(a.low.valuationUsd)}(${fmtAge(a.low.ageMin)}前) — 不触发弹窗</div>`;
-  return `<div class="co ${hot?"hot":""}"><div class="hd"><span class="name">${esc(c.name)}</span><span class="small mut">${c.platforms.map(esc).join(" · ")}</span><span class="sp"></span><div style="text-align:right">${sp}${refTxt}</div></div><div class="bd tw"><table><thead><tr><th>平台</th><th>标的</th><th class="n">价格</th><th class="n">隐含估值</th><th class="n">快照年龄</th><th>是否参与价差</th></tr></thead><tbody>${c.rows.map(rowHtml).join("")}</tbody></table></div></div>`;
+  return `<div class="co ${hot?"hot":""}"><div class="hd"><span class="name">${esc(c.name)}</span><span class="small mut">${c.platforms.map(esc).join(" · ")}</span><span class="sp"></span><div style="text-align:right">${sp}${refTxt}</div></div><div class="bd tw"><table><thead><tr><th>平台</th><th>标的</th><th class="n">价格</th><th class="n">隐含估值</th><th class="n">快照年龄</th><th>是否参与价差</th></tr></thead><tbody>${sortRows(c.rows).map(rowHtml).join("")}</tbody></table></div></div>`;
 }
 function renderActive(){const act=C.filter(c=>c.flagged);$("#actCnt").textContent=act.length;$("#actCnt").className="pill "+(act.length?"hot":"");
   const a1=act.map(c=>`<div class="alc"><b>${esc(c.name)}</b> <span class="pill hot">${c.alertSpread.spreadPct.toFixed(1)}%</span> ${c.alertSpread.unverified?'<span class="pill unv">口径未验证</span>':""} 高: <b>${esc(c.alertSpread.high.platform)}</b> ${fmtUsd(c.alertSpread.high.valuationUsd)} ／ 低: <b>${esc(c.alertSpread.low.platform)}</b> ${fmtUsd(c.alertSpread.low.valuationUsd)}</div>`).join("");
@@ -276,7 +281,7 @@ function renderActive(){const act=C.filter(c=>c.flagged);$("#actCnt").textConten
   $("#active").innerHTML=(a1+a2)||`无(阈值 ≥ ${P.threshold}%,仅新鲜数据,最大年龄 ${P.maxAgeMin} 分钟)`;}
 function renderBinNote(){const el=$("#binNote");const f=D?.freshness.find(x=>x.id==="binance");
   if(!f){el.style.display="none";return}
-  el.style.display="";el.innerHTML=`<b>ℹ️ Binance 数据来源说明</b>: Binance 官方 API 在后台服务器网络返回 HTTP 451(地区限制),这里的 Binance 价格来自<b>第三方公开聚合</b>(TradingView scanner 为主,CoinGecko 兜底),<b>并非 Binance 直连</b>,可能有延迟/偏差;隐含估值按 share-basis.json 换算:Anthropic/OpenAI = 价格 × 公告估计股数 1B(Binance 自己的合约定义,非真实总股数);SpaceX 已上市并于 2026-06-10 rebase 至 13.08B 股,这里统一按 SEC 总股数 13.18B 并与 Nasdaq SPCX 现价交叉校验。当前状态: ${f.ok?"✅ 已获取":"❌ 获取失败"}${f.error?"("+esc(f.error)+")":""}${f.ok&&f.valuation?" · "+esc(f.valuation):""}。`}
+  el.style.display="";el.innerHTML=`<b>ℹ️ Binance 数据来源说明</b>: ${/官方/.test(f.source||"")?"价格取自 <b>Binance 官方 fapi 公开接口</b>(盘口中间价;失败时自动回退 TradingView/CoinGecko 第三方聚合);":"Binance 官方 API 本轮不可用,价格来自<b>第三方公开聚合</b>(TradingView scanner 为主,CoinGecko 兜底),<b>并非 Binance 直连</b>,可能有延迟/偏差;"}隐含估值按 share-basis.json 换算:Anthropic/OpenAI = 价格 × 公告估计股数 1B(Binance 自己的合约定义,非真实总股数);SpaceX 已上市并于 2026-06-10 rebase 至 13.08B 股,这里统一按 SEC 总股数 13.18B 并与 Nasdaq SPCX 现价交叉校验。当前状态: ${f.ok?"✅ 已获取":"❌ 获取失败"}${f.error?"("+esc(f.error)+")":""}${f.ok&&f.valuation?" · "+esc(f.valuation):""}。`}
 function renderFresh(){$("#fresh").innerHTML=D?D.freshness.map(f=>{const age=f.ok&&f.latestAsOf?(Date.now()-Date.parse(f.latestAsOf))/60000:null;const use=f.ok&&age!=null&&age<=P.maxAgeMin&&f.apiStale!==true;return `<div><span class="dot ${f.ok?(use?"ok":""):"bad"}"></span> <b>${esc(f.platform)}</b> <span class="pill ${!f.ok?"bad":use?"ok":"warn"}">${!f.ok?"获取失败":use?"新鲜":"过期·仅参考"}</span><div class="small mut">${f.ok?`最新快照 ${fmtT(f.latestAsOf)}(${ago(age)})`:esc(f.error||"")}</div><div class="small mut">${f.source?"来源: "+esc(f.source)+"<br>":""}${esc(f.valuation)}</div></div>`}).join(""):"—"}
 function renderMain(){
   if(!D){$("#companies").innerHTML='<div class="mut">等待首次数据…</div>';return}
